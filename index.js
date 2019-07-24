@@ -21,24 +21,39 @@ app.get("/health", (req, res) => {
   res.send({ status: "UP" });
 });
 
+const waiit = (time) => new Promise((res)=>{
+  setTimeout(()=>{
+    res();
+  },time)
+}); 
+
+function getRandomIntInclusive(min, max) {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min + 1)) + min; //The maximum is inclusive and the minimum is inclusive 
+}
+
 const dogs = {
   '1A': {
     id: '1A', 
     ownerId: '1B',
     name: "Rex",
-    personality: 'Wild'
+    personality: 'Wild',
+    age: 1
   }, 
   '2A': {
     id: '2A', 
     ownerId: '2B',
     name: "Dobby",
-    personality: 'Happy'
+    personality: 'Happy',
+    age: 2
   }, 
   '3A': {
     id: '3A', 
     ownerId: '3B',
     name: "Oscar",
-    personality: 'Moody'
+    personality: 'Moody',
+    age: 3
   }, 
 };
 
@@ -46,7 +61,7 @@ const owners = {
   '1B': {
     id: '1B', 
     name: "Joe",
-    personality: 'Awesome'
+    personality: 'Awesome',
   }, 
   '2B': {
     id: '2B', 
@@ -55,10 +70,12 @@ const owners = {
   }, 
 }
 
+
 // Create GRAPHQL SCHEMA
-const dogQueryResolver = ( root, args ) => {
+const dogQueryResolver = async ( root, args ) => {
   const dog = dogs[args.id];
   console.log('Dog:', dog);
+  await waiit(2000);
   return dog;
 };
 
@@ -70,19 +87,65 @@ const ownerResolver = ( dog ) => {
   return owner;
 };
 
-const ownerQueryResolver = ( root, args ) => {
+const ownerQueryResolver = async ( root, args ) => {
   const owner = owners[args.id];
   console.log('Owner:', owner);
+  await waiit(2000);
   return owner;
+}
+
+const randResolver = () => {
+  return getRandomIntInclusive(0, 100000); 
+}
+
+const changeDogAge = ( root, { id, age } ) => {
+  console.log('Change dog age', id, age);
+  dogs[id].age = age;
+  console.log('Dog:', dogs[id]);
+  return dogs[id];
+}
+
+const dogsResolver = () => {
+  // Change the rand every time the fav dog res is called
+  dogs['1A'].rand = randResolver();
+  return [ dogs['1A'] ];
+}
+
+const dogParkResolver = async () => {
+  await waiit(2000);
+  return {
+    name: 'The Dog Park',
+    dogs: dogsResolver()
+  };
+} 
+
+const averageAgeResolver = (root) => {
+  const sum = root.dogs.reduce( (acc, cur) => acc + cur.age, 0)
+  const length = root.dogs.length;
+  console.log('SUM', sum);
+  console.log('LENGHT', length);
+  return sum / length;
 }
 
 const resolvers = {
   Query: {
     dog: dogQueryResolver,
-    owner: ownerQueryResolver
+    owner: ownerQueryResolver,
+    dogPark: dogParkResolver,
+    dogParkByName: dogParkResolver
+  },
+  Mutation: {
+    changeDogAge
   },
   Dog: {
-    owner: ownerResolver
+    owner: ownerResolver,
+    rand: randResolver
+  }, 
+  Owner: { 
+    rand: randResolver
+  },
+  DogPark: {
+    averageAge: averageAgeResolver
   }
 };
 
@@ -91,14 +154,27 @@ const typeDefs = `
     id: ID!
     name: String!
     owner: Owner
+    rand: Int
+    age: Int
   }
   type Owner {
     name: String!
     id: ID!
+    rand: Int
+  }
+  type DogPark {
+    name: String
+    dogs: [Dog]
+    averageAge: Int
   }
   type Query {
     dog(id: ID!): Dog!
     owner(id: ID!): Owner!
+    dogPark: DogPark!
+    dogParkByName( name: String! ): DogPark!
+  }
+  type Mutation {
+    changeDogAge(id: ID!, age: Int!): Dog!
   }
 `;
 
